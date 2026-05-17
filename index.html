@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LevelUp — Self Improvement</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #050508;
+    --surface: #0d0d14;
+    --border: rgba(255,255,255,0.07);
+    --accent: #7c3aed;
+    --accent2: #06b6d4;
+    --accent3: #f59e0b;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --radius: 16px;
+    --lap-a: #7c3aed;
+    --lap-b: #06b6d4;
+  }
+
+  html, body { width:100%; height:100%; overflow:hidden; font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); user-select:none; }
+
+  #bg-canvas { position:fixed; inset:0; z-index:0; pointer-events:none; }
+
+  #app {
+    position:relative; z-index:1;
+    width:100vw; height:100vh;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:space-between;
+    padding:28px 24px 0;
+  }
+
+  /* TOP BAR */
+  #topbar { width:100%; display:flex; align-items:flex-start; justify-content:space-between; flex-shrink:0; }
+  
+  #top-left-wrap { display:flex; flex-direction:column; gap:6px; }
+  #logo { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:3px; color:var(--muted); line-height:1;}
+  
+  /* STREAK DISPLAY */
+  #streak-display { font-family:'Space Mono',monospace; font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.03); padding:4px 10px; border-radius:99px; border:1px solid var(--border); width:fit-content;}
+  #streak-icon { font-size:14px; filter:grayscale(1); opacity:0.5; transition:all 0.5s; }
+  #streak-icon.active { filter:grayscale(0); opacity:1; animation:firePulse 1.5s infinite alternate ease-in-out; }
+  #streak-count-val { color:var(--text); font-weight:700; }
+  @keyframes firePulse { 0% { transform:scale(1); filter:drop-shadow(0 0 2px rgba(245,158,11,0.4)); } 100% { transform:scale(1.15); filter:drop-shadow(0 0 8px rgba(245,158,11,0.9)); } }
+
+  #age-display { font-family:'Space Mono',monospace; font-size:10px; color:var(--muted); text-align:right; line-height:1.9; }
+  #age-text { color:var(--accent2); font-size:12px; font-weight:700; letter-spacing:1px; }
+
+  /* CENTER */
+  #center { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
+  #level-label { font-family:'Space Mono',monospace; font-size:12px; letter-spacing:4px; color:var(--accent2); text-transform:uppercase; }
+
+  #level-ring { position:relative; width:220px; height:220px; }
+  #level-ring svg { position:absolute; inset:0; width:100%; height:100%; }
+  .ring-bg { fill:none; stroke:rgba(255,255,255,0.05); stroke-width:3; }
+  .ring-fill { fill:none; stroke:url(#ringGrad); stroke-width:3; stroke-linecap:round; transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1); transform:rotate(-90deg); transform-origin:50% 50%; }
+
+  #level-number {
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    font-family:'Bebas Neue',sans-serif; font-size:90px; line-height:1; color:#fff;
+    text-shadow:0 0 60px rgba(124,58,237,0.6);
+  }
+  #level-number small { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:3px; color:var(--muted); margin-top:-6px; }
+
+  /* DRAGGABLE LAP BADGE (Shadow Removed) */
+  #lap-badge {
+    position:absolute; top:25vh; right:25vw; z-index:10;
+    font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1px;
+    background:rgba(0,0,0,0.75); border:1px solid var(--lap-a); color:var(--lap-a);
+    padding:6px 12px; border-radius:99px; transition:color .5s, border-color .5s, transform .2s;
+    cursor:grab; backdrop-filter:blur(4px); 
+  }
+  #lap-badge:active { cursor:grabbing; transform:scale(1.05); }
+
+  #xp-bar-wrap { width:280px; display:flex; flex-direction:column; gap:6px; }
+  #xp-label { font-family:'Space Mono',monospace; font-size:10px; color:var(--muted); display:flex; justify-content:space-between; }
+  #xp-track { width:100%; height:4px; background:rgba(255,255,255,0.07); border-radius:99px; overflow:hidden; }
+  #xp-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--lap-a),var(--lap-b)); transition:width 1s cubic-bezier(.4,0,.2,1); }
+
+  /* LEVEL UP BUTTON */
+  #levelup-btn {
+    position:relative; overflow:hidden; padding:16px 48px;
+    font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:4px;
+    color:#fff; border:none; border-radius:99px; cursor:pointer;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    box-shadow:0 0 30px rgba(124,58,237,0.4); transition:transform .15s, box-shadow .15s;
+  }
+  #levelup-btn::before { content:''; position:absolute; inset:0; background:rgba(255,255,255,0); transition:background .2s; }
+  #levelup-btn:hover { transform:scale(1.04); box-shadow:0 0 50px rgba(124,58,237,0.65); }
+  #levelup-btn:hover::before { background:rgba(255,255,255,0.08); }
+  #levelup-btn:active { transform:scale(0.97); }
+  .ripple { position:absolute; border-radius:50%; background:rgba(255,255,255,0.3); transform:scale(0); animation:rippleAnim .5s linear; pointer-events:none; }
+  @keyframes rippleAnim { to { transform:scale(4); opacity:0; } }
+
+  /* TIMELINE */
+  #timeline-area { width:100%; padding-bottom:18px; flex-shrink:0; }
+  #timeline-header {
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    margin-bottom:0; cursor:pointer; padding:8px 0;
+  }
+  #timeline-header:hover #timeline-title { color:var(--text); }
+  #timeline-title { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:3px; color:var(--muted); transition:color .2s; }
+  #timeline-toggle {
+    font-size:9px; color:var(--muted);
+    background:rgba(255,255,255,0.05); border:1px solid var(--border);
+    padding:2px 9px; border-radius:99px; cursor:pointer;
+    transition:all .2s; font-family:'Space Mono',monospace;
+  }
+  #timeline-header:hover #timeline-toggle { background:rgba(255,255,255,0.1); color:var(--text); }
+
+  #timeline-body { overflow:hidden; max-height:0; opacity:0; transition:max-height .45s cubic-bezier(.4,0,.2,1), opacity .35s; display:flex; flex-direction:column; align-items:center; }
+  #timeline-body.open { max-height:190px; opacity:1; }
+
+  /* SEARCH BAR & CALENDAR */
+  #search-wrap { display:flex; gap:10px; width:min(520px, 90vw); margin:10px 0; position:relative; opacity:0; transition:opacity 0.3s; pointer-events:none; }
+  #timeline-body.open #search-wrap { opacity:1; pointer-events:all; transition-delay:0.2s; }
+  .search-input-box { position:relative; flex:1; }
+  #timeline-search { width:100%; background:rgba(0,0,0,0.5); border:1px solid var(--border); border-radius:99px; padding:8px 16px 8px 32px; color:var(--text); font-family:'Inter',sans-serif; font-size:12px; outline:none; transition:border-color .2s; }
+  #timeline-search:focus { border-color:var(--accent); }
+  #search-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:12px; filter:grayscale(1); opacity:0.5; }
+  
+  #timeline-date-search { background:rgba(0,0,0,0.5); border:1px solid var(--border); border-radius:99px; padding:8px 14px; color:var(--text); font-family:'Inter',sans-serif; font-size:12px; outline:none; transition:border-color .2s; cursor:pointer; }
+  #timeline-date-search:focus { border-color:var(--accent); }
+  #timeline-date-search::-webkit-calendar-picker-indicator { filter: invert(1); cursor:pointer; opacity: 0.6; transition: opacity 0.2s; }
+  #timeline-date-search::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+
+  #timeline-scroll { width:100%; overflow-x:auto; overflow-y:hidden; padding-bottom:6px; scrollbar-width:thin; scrollbar-color:var(--accent) transparent; }
+  #timeline-scroll::-webkit-scrollbar { height:3px; }
+  #timeline-scroll::-webkit-scrollbar-thumb { background:var(--accent); border-radius:99px; }
+
+  #timeline-track { display:flex; align-items:center; min-width:max-content; padding:14px 40px 24px; }
+  .tl-connector { height:2px; flex:0 0 32px; background:linear-gradient(90deg,rgba(124,58,237,0.3),rgba(6,182,212,0.3)); }
+  .tl-node {
+    flex-shrink:0; width:40px; height:40px; border-radius:50%;
+    background:var(--surface); border:2px solid var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Mono',monospace; font-size:10px; color:var(--accent);
+    cursor:pointer; transition:all .2s;
+  }
+  .tl-node:hover { background:var(--accent); color:#fff; transform:scale(1.15); box-shadow:0 0 16px rgba(124,58,237,0.6); }
+  .tl-node.first-entry { border-color:var(--accent3); color:var(--accent3); box-shadow:0 0 12px rgba(245,158,11,0.3); }
+  .tl-node.first-entry:hover { background:var(--accent3); color:#000; }
+  #timeline-empty { font-family:'Space Mono',monospace; font-size:10px; color:var(--muted); text-align:center; padding:24px 40px; }
+
+  /* OVERLAY / POPUP */
+  .overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .3s; }
+  .overlay.active { opacity:1; pointer-events:all; }
+  .popup { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:36px 32px; width:min(520px,92vw); max-height:85vh; overflow-y:auto; position:relative; transform:translateY(24px) scale(0.97); transition:transform .35s cubic-bezier(.4,0,.2,1); scrollbar-width:thin; scrollbar-color:var(--accent) transparent; }
+  .popup::-webkit-scrollbar { width:3px; }
+  .popup::-webkit-scrollbar-thumb { background:var(--accent); border-radius:99px; }
+  .overlay.active .popup { transform:none; }
+  .popup-close { position:absolute; top:16px; right:16px; width:30px; height:30px; background:rgba(255,255,255,0.06); border:none; border-radius:50%; color:var(--muted); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+  .popup-close:hover { background:rgba(255,255,255,0.12); color:#fff; }
+  .popup h2 { font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:2px; margin-bottom:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .popup .popup-sub { font-size:12px; color:var(--muted); margin-bottom:28px; font-family:'Space Mono',monospace; }
+
+  .field { margin-bottom:20px; }
+  .field label { display:block; font-size:10px; letter-spacing:2px; color:var(--accent2); margin-bottom:8px; font-family:'Space Mono',monospace; text-transform:uppercase; }
+  .field input, .field textarea { width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:'Inter',sans-serif; font-size:14px; outline:none; transition:border-color .2s, box-shadow .2s; resize:none; }
+  .field input:focus, .field textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(124,58,237,0.15); }
+  .field input::placeholder, .field textarea::placeholder { color:var(--muted); }
+
+  .submit-btn { width:100%; padding:15px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none; border-radius:10px; color:#fff; font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:3px; cursor:pointer; transition:all .2s; box-shadow:0 4px 24px rgba(124,58,237,0.3); }
+  .submit-btn:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(124,58,237,0.45); }
+  .submit-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+
+  /* HISTORY CARDS */
+  #history-popup .entry-card { background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:14px; transition:border-color .3s, box-shadow .3s; }
+  #history-popup .entry-card:last-child { margin-bottom:0; }
+  .entry-number { font-family:'Bebas Neue',sans-serif; font-size:13px; color:var(--accent2); margin-bottom:2px; }
+  .entry-heading { font-size:16px; font-weight:600; margin-bottom:4px; color:#fff; }
+  .entry-desc { font-size:13px; color:var(--muted); margin-bottom:8px; line-height:1.5; }
+  .entry-summary { font-size:12px; color:rgba(255,255,255,0.45); font-style:italic; line-height:1.5; }
+  .entry-meta { font-family:'Space Mono',monospace; font-size:9px; color:var(--muted); margin-top:10px; letter-spacing:1px; }
+
+  /* FILE STATUS */
+  #file-status {
+    position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
+    font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1px;
+    color:var(--muted); background:rgba(0,0,0,0.7); border:1px solid var(--border);
+    border-radius:99px; padding:5px 16px; z-index:50;
+    opacity:0; transition:opacity .3s; pointer-events:none; white-space:nowrap;
+  }
+  #file-status.show { opacity:1; }
+
+  /* REGULAR CELEBRATION */
+  #celebration-overlay { position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; pointer-events:none; opacity:0; }
+  #celebration-overlay.burst { animation:celebFade 2.4s ease-out forwards; }
+  @keyframes celebFade { 0%{opacity:0} 15%{opacity:1} 70%{opacity:1} 100%{opacity:0} }
+  #celeb-text { font-family:'Bebas Neue',sans-serif; font-size:clamp(48px,12vw,100px); letter-spacing:4px; background:linear-gradient(135deg,#f59e0b,#ec4899,#7c3aed,#06b6d4); -webkit-background-clip:text; -webkit-text-fill-color:transparent; text-align:center; filter:drop-shadow(0 0 40px rgba(245,158,11,0.6)); animation:celebText 2.4s ease-out forwards; }
+  @keyframes celebText { 0%{transform:scale(0.5)} 20%{transform:scale(1.08)} 35%{transform:scale(0.96)} 50%{transform:scale(1)} 80%{transform:scale(1)} 100%{transform:scale(1.15);opacity:0} }
+
+  /* LAP CELEBRATION */
+  #lap-overlay { position:fixed; inset:0; z-index:210; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; opacity:0; }
+  #lap-overlay.burst { animation:lapFade 3.8s ease-out forwards; }
+  @keyframes lapFade { 0%{opacity:0} 8%{opacity:1} 70%{opacity:1} 100%{opacity:0} }
+  #lap-flash { position:absolute; inset:0; background:radial-gradient(ellipse at center,rgba(245,158,11,0.22) 0%,transparent 65%); animation:lapFlashAnim 3.8s ease-out forwards; }
+  @keyframes lapFlashAnim { 0%{opacity:0} 10%{opacity:1} 55%{opacity:0.7} 100%{opacity:0} }
+  #lap-text { position:relative; z-index:1; font-family:'Bebas Neue',sans-serif; font-size:clamp(40px,9vw,82px); letter-spacing:5px; text-align:center; line-height:1.1; color:#fff; text-shadow:0 0 60px rgba(245,158,11,0.9),0 0 120px rgba(245,158,11,0.4); animation:lapTextAnim 3.8s ease-out forwards; }
+  #lap-text span { display:block; font-size:0.42em; letter-spacing:4px; color:var(--accent3); margin-top:4px; }
+  @keyframes lapTextAnim { 0%{transform:scale(0.55) translateY(40px);opacity:0} 14%{transform:scale(1.06) translateY(-5px);opacity:1} 28%{transform:scale(0.98);opacity:1} 80%{transform:scale(1);opacity:1} 100%{transform:scale(1.06);opacity:0} }
+  #lap-sub { position:relative; z-index:1; margin-top:14px; font-family:'Space Mono',monospace; font-size:12px; letter-spacing:3px; color:rgba(255,255,255,0.55); animation:lapSubAnim 3.8s ease-out forwards; }
+  @keyframes lapSubAnim { 0%,12%{opacity:0} 24%{opacity:1} 78%{opacity:1} 100%{opacity:0} }
+
+  /* CONFETTI */
+  .confetti-piece { position:fixed; top:-14px; border-radius:2px; animation:confettiFall linear forwards; }
+  @keyframes confettiFall { 0%{transform:translateY(0) rotate(0deg);opacity:1} 100%{transform:translateY(108vh) rotate(720deg);opacity:0} }
+
+  /* BOUNCE */
+  @keyframes levelBounce { 0%{transform:scale(1)} 30%{transform:scale(1.35)} 55%{transform:scale(0.88)} 75%{transform:scale(1.1)} 100%{transform:scale(1)} }
+  .bounce { animation:levelBounce .7s cubic-bezier(.4,0,.2,1); }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div id="app">
+  <!-- Draggable Lap Badge -->
+  <div id="lap-badge">LAP 1</div>
+
+  <div id="topbar">
+    <div id="top-left-wrap">
+      <div id="logo">LEVELUP</div>
+      <div id="streak-display">
+        <span id="streak-icon">🔥</span>
+        <span>STREAK: <span id="streak-count-val">0</span></span>
+      </div>
+    </div>
+    <div id="age-display">
+      <span id="age-text">—</span><br/>
+      <span style="font-size:9px;letter-spacing:1px">AGE</span>
+    </div>
+  </div>
+
+  <div id="center">
+    <div id="level-label">CURRENT LEVEL</div>
+
+    <div id="level-ring">
+      <svg viewBox="0 0 220 220">
+        <defs>
+          <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop id="rg1" offset="0%"   stop-color="#7c3aed"/>
+            <stop id="rg2" offset="100%" stop-color="#06b6d4"/>
+          </linearGradient>
+        </defs>
+        <circle class="ring-bg"   cx="110" cy="110" r="100"/>
+        <circle class="ring-fill" id="ring-arc" cx="110" cy="110" r="100"
+                stroke-dasharray="628" stroke-dashoffset="628"/>
+      </svg>
+      <div id="level-number">
+        <span id="lvl-val">0</span>
+        <small>LEVEL</small>
+      </div>
+    </div>
+
+    <div id="xp-bar-wrap">
+      <div id="xp-label">
+        <span>LAP PROGRESS</span>
+        <span id="xp-count">0 / 10 tasks</span>
+      </div>
+      <div id="xp-track"><div id="xp-fill" style="width:0%"></div></div>
+    </div>
+
+    <button id="levelup-btn" onclick="openLevelUpPopup(event)">⚡ LEVEL UP</button>
+  </div>
+
+  <div id="timeline-area">
+    <div id="timeline-header" onclick="toggleTimeline()">
+      <div id="timeline-title">ACHIEVEMENT TIMELINE</div>
+      <div id="timeline-toggle">▼ EXPAND</div>
+    </div>
+    <div id="timeline-body">
+      <div id="search-wrap">
+        <div class="search-input-box">
+          <span id="search-icon">🔍</span>
+          <input type="text" id="timeline-search" placeholder="Search task # or text..." oninput="renderTimeline()" />
+        </div>
+        <input type="date" id="timeline-date-search" oninput="renderTimeline()" title="Filter by Date" />
+      </div>
+      <div id="timeline-scroll">
+        <div id="timeline-track">
+          <div id="timeline-empty">No achievements yet. Hit LEVEL UP to begin!</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LEVEL UP POPUP -->
+<div class="overlay" id="levelup-overlay">
+  <div class="popup">
+    <button class="popup-close" onclick="closeLevelUpPopup()">✕</button>
+    <h2>Log Achievement</h2>
+    <p class="popup-sub">TELL ME WHAT YOU CRUSHED TODAY</p>
+    <div class="field">
+      <label>Heading</label>
+      <input type="text" id="inp-heading" placeholder="e.g. Solved Binary Search problem" maxlength="80"/>
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <textarea id="inp-desc" rows="3" placeholder="What exactly did you do? Be specific."></textarea>
+    </div>
+    <div class="field">
+      <label>Summary / Reflection</label>
+      <textarea id="inp-summary" rows="3" placeholder="What did you learn or feel? One insight."></textarea>
+    </div>
+    <button class="submit-btn" id="submit-btn" onclick="submitLevelUp()">SUBMIT &amp; LEVEL UP</button>
+  </div>
+</div>
+
+<!-- HISTORY POPUP -->
+<div class="overlay" id="history-overlay">
+  <div class="popup" id="history-popup">
+    <button class="popup-close" onclick="closeHistoryPopup()">✕</button>
+    <h2>ACHIEVEMENTS</h2>
+    <p class="popup-sub" id="history-sub">ALL YOUR WINS</p>
+    <div id="history-list"></div>
+  </div>
+</div>
+
+<!-- REGULAR CELEBRATION -->
+<div id="celebration-overlay">
+  <div id="celeb-text">LEVEL UP!</div>
+</div>
+
+<!-- LAP CELEBRATION -->
+<div id="lap-overlay">
+  <div id="lap-flash"></div>
+  <div id="lap-text">LAP COMPLETE!<span>CONGRATULATIONS</span></div>
+  <div id="lap-sub">— YOU'RE ON A ROLL —</div>
+</div>
+
+<div id="file-status">💾 saved</div>
+
+<script>
+/* ═══════════════════════════════════
+   LAP PALETTES
+═══════════════════════════════════ */
+const LAP_PALETTES = [
+  { a:'#7c3aed', b:'#06b6d4' },  // lap 1   levels  0–9
+  { a:'#ec4899', b:'#f97316' },  // lap 2   levels 10–19
+  { a:'#10b981', b:'#06b6d4' },  // lap 3   levels 20–29
+  { a:'#f59e0b', b:'#ef4444' },  // lap 4   levels 30–39
+  { a:'#8b5cf6', b:'#10b981' },  // lap 5   levels 40–49
+  { a:'#06b6d4', b:'#ec4899' },  // lap 6   levels 50–59
+  { a:'#f97316', b:'#8b5cf6' },  // lap 7   levels 60–69
+  { a:'#ef4444', b:'#f59e0b' },  // lap 8   levels 70–79
+  { a:'#10b981', b:'#f59e0b' },  // lap 9   levels 80–89
+  { a:'#e879f9', b:'#38bdf8' },  // lap 10  levels 90–99
+];
+
+function lapIndex(level) {
+  return Math.floor(level / 10) % LAP_PALETTES.length;
+}
+
+/* animate SVG gradient stop colour */
+function animateStop(stopEl, fromHex, toHex, ms) {
+  const from = hexRgb(fromHex) || {r:124,g:58,b:237};
+  const to   = hexRgb(toHex)   || {r:6,g:182,b:212};
+  const t0   = performance.now();
+  function frame(now) {
+    const p = Math.min((now - t0) / ms, 1);
+    const e = p < .5 ? 2*p*p : -1+(4-2*p)*p;
+    const r = Math.round(from.r + (to.r-from.r)*e);
+    const g = Math.round(from.g + (to.g-from.g)*e);
+    const b = Math.round(from.b + (to.b-from.b)*e);
+    stopEl.setAttribute('stop-color', `rgb(${r},${g},${b})`);
+    if (p < 1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+function hexRgb(hex) {
+  const m = (hex||'').replace('#','').match(/../g);
+  return m ? {r:parseInt(m[0],16),g:parseInt(m[1],16),b:parseInt(m[2],16)} : null;
+}
+
+function applyPalette(level, animate) {
+  const pal  = LAP_PALETTES[lapIndex(level)];
+  const stop1 = document.getElementById('rg1');
+  const stop2 = document.getElementById('rg2');
+
+  if (animate) {
+    animateStop(stop1, stop1.getAttribute('stop-color'), pal.a, 1600);
+    animateStop(stop2, stop2.getAttribute('stop-color'), pal.b, 1600);
+  } else {
+    stop1.setAttribute('stop-color', pal.a);
+    stop2.setAttribute('stop-color', pal.b);
+  }
+
+  // CSS vars for xp-fill and lap-badge
+  document.documentElement.style.setProperty('--lap-a', pal.a);
+  document.documentElement.style.setProperty('--lap-b', pal.b);
+  document.getElementById('xp-fill').style.background =
+    `linear-gradient(90deg,${pal.a},${pal.b})`;
+
+  const lapNum = Math.floor(level / 10) + 1;
+  const badge  = document.getElementById('lap-badge');
+  badge.textContent    = `LAP ${lapNum}`;
+  badge.style.borderColor = pal.a;
+  badge.style.color       = pal.a;
+}
+
+/* ═══════════════════════════════════
+   STATE & STORAGE
+═══════════════════════════════════ */
+const STORAGE_KEY = 'levelup_data';
+const DOB = new Date('2002-05-22');
+
+// Added "streak: 0" to base state for persistence
+let state       = { level:0, entries:[], lapPos: null, streak: 0 };
+let fileHandle  = null;
+let tlOpen      = false;
+let statusTimer = null;
+
+/* ── Exact age ─────────────────── */
+function updateAge() {
+  const now = new Date();
+  let y = now.getFullYear() - DOB.getFullYear();
+  let m = now.getMonth()    - DOB.getMonth();
+  let d = now.getDate()     - DOB.getDate();
+  if (d < 0) { m--; d += new Date(now.getFullYear(), now.getMonth(), 0).getDate(); }
+  if (m < 0) { y--; m += 12; }
+  document.getElementById('age-text').textContent = `${y}y ${m}m ${d}d`;
+}
+updateAge();
+setInterval(updateAge, 30000);
+
+/* ── Streak Calculator ─────────── */
+function updateStreak() {
+  const dates = [...new Set(state.entries.map(e => new Date(e.timestamp).toDateString()))];
+  dates.sort((a, b) => new Date(b) - new Date(a));
+
+  let streak = 0;
+  let current = new Date();
+  current.setHours(0,0,0,0);
+
+  let checkDate = new Date(current);
+  
+  // Check if today or yesterday started the streak
+  if (dates.length > 0) {
+    if (dates[0] !== checkDate.toDateString()) {
+      checkDate.setDate(checkDate.getDate() - 1);
+      if (dates[0] === checkDate.toDateString()) {
+        // Valid streak start from yesterday
+      } else {
+        // Missed yesterday entirely
+        streak = 0;
+      }
+    }
+
+    if (streak !== 0 || dates[0] === checkDate.toDateString()) {
+      let dateIdx = 0;
+      while (dateIdx < dates.length) {
+        if (dates[dateIdx] === checkDate.toDateString()) {
+          streak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+          dateIdx++;
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  // Backup the calculated streak directly into state
+  if (state.streak !== streak) {
+    state.streak = streak;
+    // (We'll save this automatically during levelup or load)
+  }
+
+  renderStreak(streak);
+}
+
+function renderStreak(streak) {
+  document.getElementById('streak-count-val').textContent = streak;
+  const icon = document.getElementById('streak-icon');
+  if (streak > 0) {
+    icon.classList.add('active');
+  } else {
+    icon.classList.remove('active');
+  }
+}
+
+
+/* ── IndexedDB: persist fileHandle ─ */
+function openIDB() {
+  return new Promise((res,rej) => {
+    const r = indexedDB.open('lu_fs', 1);
+    r.onupgradeneeded = e => e.target.result.createObjectStore('h');
+    r.onsuccess = e => res(e.target.result);
+    r.onerror   = e => rej(e);
+  });
+}
+async function getHandle() {
+  try {
+    const db = await openIDB();
+    return new Promise((res,rej) => {
+      const tx = db.transaction('h','readonly');
+      const r  = tx.objectStore('h').get('main');
+      r.onsuccess = e => res(e.target.result||null);
+      r.onerror   = rej;
+    });
+  } catch { return null; }
+}
+async function putHandle(h) {
+  try {
+    const db = await openIDB();
+    const tx = db.transaction('h','readwrite');
+    tx.objectStore('h').put(h,'main');
+  } catch {}
+}
+
+/* ── Save ──────────────────────── */
+async function saveData() {
+  const json = JSON.stringify(state, null, 2);
+  localStorage.setItem(STORAGE_KEY, json);
+
+  if (fileHandle) {
+    try {
+      const w = await fileHandle.createWritable();
+      await w.write(json); await w.close();
+      showStatus('💾 saved to data.json');
+      return;
+    } catch(e) {
+      showStatus('⚠ file write failed — saved to localStorage');
+    }
+  } else {
+    showStatus('💾 saved to localStorage');
+  }
+}
+
+/* ── Load ──────────────────────── */
+async function loadData() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) { try { state = Object.assign(state, JSON.parse(raw)); } catch {} }
+
+  if (window.showSaveFilePicker) {
+    const h = await getHandle();
+    if (h) {
+      try {
+        let perm = await h.queryPermission({ mode:'readwrite' });
+        if (perm !== 'granted') perm = await h.requestPermission({ mode:'readwrite' });
+        if (perm === 'granted') {
+          fileHandle = h;
+          const file = await h.getFile();
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          state = Object.assign(state, parsed);
+          localStorage.setItem(STORAGE_KEY, text);
+          showStatus('📂 loaded from data.json');
+        }
+      } catch {}
+    }
+  }
+
+  // Restore draggable badge position
+  if (state.lapPos) {
+    const badge = document.getElementById('lap-badge');
+    badge.style.left = state.lapPos.left;
+    badge.style.top = state.lapPos.top;
+    badge.style.right = 'auto';
+  }
+
+  renderAll();
+  
+  // Cleanly compute and update streak data just in case a day passed
+  updateStreak();
+  saveData(); // Commit the streak change natively if required
+}
+
+/* ── Connect file manually ─────── */
+async function connectFile() {
+  if (!window.showSaveFilePicker) {
+    showStatus('⚠ File API not supported — use Chrome/Edge');
+    return;
+  }
+  try {
+    const h = await window.showSaveFilePicker({
+      suggestedName:'data.json',
+      types:[{ description:'JSON', accept:{'application/json':['.json']} }],
+    });
+    fileHandle = h;
+    await putHandle(h);
+    await saveData();
+  } catch {}
+}
+
+/* ── Status pill ───────────────── */
+function showStatus(msg) {
+  const el = document.getElementById('file-status');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+/* ═══════════════════════════════════
+   RENDER
+═══════════════════════════════════ */
+function renderAll() { 
+  renderLevel(); 
+  renderTimeline(); 
+  updateStreak(); 
+}
+
+function renderLevel(animate) {
+  const lvl = state.level;
+  document.getElementById('lvl-val').textContent = lvl;
+
+  // Ring fill (0 at start of each lap, full at 10)
+  const pct    = (lvl % 10) / 10;
+  const circ   = 2 * Math.PI * 100;
+  document.getElementById('ring-arc').style.strokeDashoffset = circ - pct * circ;
+
+  // XP bar
+  document.getElementById('xp-fill').style.width = (pct * 100) + '%';
+  document.getElementById('xp-count').textContent = `${lvl % 10} / 10 tasks`;
+
+  applyPalette(lvl, animate);
+}
+
+/* ── Timeline (Filtered & Reversed) ─ */
+function renderTimeline() {
+  const track   = document.getElementById('timeline-track');
+  const entries = state.entries;
+  
+  const query     = document.getElementById('timeline-search').value.toLowerCase().trim();
+  const dateQuery = document.getElementById('timeline-date-search').value; // 'YYYY-MM-DD' format
+  
+  // Removes leading zeroes for robust number searching (e.g., '01' becomes '1')
+  const strippedQuery = query.replace(/^0+/, '') || query; 
+  
+  track.innerHTML = '';
+  const cnt = entries.length;
+  updateToggleLabel(cnt);
+
+  if (!cnt) {
+    track.innerHTML = '<div id="timeline-empty">No achievements yet. Hit LEVEL UP to begin!</div>';
+    return;
+  }
+
+  // Attach original indices & filter
+  const filteredReversed = entries.map((e, idx) => ({ ...e, origZero: idx, taskNum: idx + 1 }))
+    .filter(e => {
+      // 1. Check Date (if a date is selected)
+      if (dateQuery) {
+        const d = new Date(e.timestamp);
+        // Build Local YYYY-MM-DD to strictly compare with Date picker
+        const localYMD = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        if (localYMD !== dateQuery) return false;
+      }
+
+      // 2. Check Text / Number Match
+      if (query) {
+        const matchText = e.taskNum.toString() === strippedQuery || 
+                          e.taskNum.toString().includes(query) ||
+                          e.heading.toLowerCase().includes(query) ||
+                          e.desc.toLowerCase().includes(query) ||
+                          e.summary.toLowerCase().includes(query);
+        if (!matchText) return false;
+      }
+
+      return true;
+    }).reverse();
+
+  if (!filteredReversed.length) {
+    track.innerHTML = '<div id="timeline-empty" style="color:var(--accent2)">No matches found for your search.</div>';
+    return;
+  }
+
+  filteredReversed.forEach((e, i) => {
+    if (i > 0) {
+      const line = document.createElement('div');
+      line.className = 'tl-connector';
+      track.appendChild(line);
+    }
+    const node = document.createElement('div');
+    // Highlight if it's literally the first ever entry
+    node.className = 'tl-node' + (e.taskNum === 1 ? ' first-entry' : '');
+    node.textContent = e.taskNum;
+    node.title = e.heading;
+    node.onclick = () => openHistoryPopup(e.origZero);
+    track.appendChild(node);
+  });
+
+  // Auto-scroll to start only if not actively typing to avoid jumpiness
+  if (!query && !dateQuery) {
+    requestAnimationFrame(() => {
+      document.getElementById('timeline-scroll').scrollLeft = 0;
+    });
+  }
+}
+
+function updateToggleLabel(cnt) {
+  document.getElementById('timeline-toggle').textContent =
+    tlOpen ? '▲ COLLAPSE' : (cnt ? `▼ EXPAND (${cnt})` : '▼ EXPAND');
+}
+
+function toggleTimeline() {
+  tlOpen = !tlOpen;
+  document.getElementById('timeline-body').classList.toggle('open', tlOpen);
+  updateToggleLabel(state.entries.length);
+}
+
+/* ═══════════════════════════════════
+   LEVEL UP POPUP
+═══════════════════════════════════ */
+function openLevelUpPopup(ev) {
+  if (ev) {
+    const btn  = document.getElementById('levelup-btn');
+    const r    = document.createElement('span');
+    r.className = 'ripple';
+    const rect  = btn.getBoundingClientRect();
+    const sz    = Math.max(rect.width, rect.height);
+    r.style.cssText = `width:${sz}px;height:${sz}px;left:${ev.clientX-rect.left-sz/2}px;top:${ev.clientY-rect.top-sz/2}px`;
+    btn.appendChild(r);
+    setTimeout(() => r.remove(), 600);
+  }
+  clearForm();
+  document.getElementById('levelup-overlay').classList.add('active');
+  setTimeout(() => document.getElementById('inp-heading').focus(), 350);
+}
+function closeLevelUpPopup() { document.getElementById('levelup-overlay').classList.remove('active'); }
+function clearForm() {
+  ['inp-heading','inp-desc','inp-summary'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('submit-btn').disabled = false;
+}
+
+async function submitLevelUp() {
+  const heading = document.getElementById('inp-heading').value.trim();
+  const desc    = document.getElementById('inp-desc').value.trim();
+  const summary = document.getElementById('inp-summary').value.trim();
+
+  if (!heading || !desc || !summary) {
+    ['inp-heading','inp-desc','inp-summary'].forEach(id => {
+      if (!document.getElementById(id).value.trim()) {
+        const el = document.getElementById(id);
+        el.style.borderColor = '#f43f5e';
+        el.style.boxShadow   = '0 0 0 3px rgba(244,63,94,0.2)';
+        setTimeout(() => { el.style.borderColor=''; el.style.boxShadow=''; }, 1200);
+      }
+    });
+    return;
+  }
+
+  document.getElementById('submit-btn').disabled = true;
+
+  const newLevel     = state.level + 1;
+  const isLapFinish  = newLevel % 10 === 0; 
+
+  state.entries.push({ level:newLevel, heading, desc, summary, timestamp:new Date().toISOString() });
+  state.level = newLevel;
+
+  // Make sure we update the streak number BEFORE we save everything to data.json
+  updateStreak();
+  
+  await saveData();
+  closeLevelUpPopup();
+
+  const ln = document.getElementById('level-number');
+  ln.classList.remove('bounce'); void ln.offsetWidth; ln.classList.add('bounce');
+  ln.addEventListener('animationend', () => ln.classList.remove('bounce'), { once:true });
+
+  renderAll();
+  confettiBurst(80, null);
+  triggerCelebration(isLapFinish);
+}
+
+/* ═══════════════════════════════════
+   CELEBRATIONS
+═══════════════════════════════════ */
+function triggerCelebration(isLapFinish) {
+  const ov = document.getElementById('celebration-overlay');
+  document.getElementById('celeb-text').textContent = `LEVEL ${state.level}!`;
+  ov.classList.remove('burst'); void ov.offsetWidth; ov.classList.add('burst');
+
+  if (isLapFinish) {
+    setTimeout(triggerLapCelebration, 2600);
+  }
+}
+
+function triggerLapCelebration() {
+  const lapNum = state.level / 10;
+  applyPalette(state.level, true);
+
+  document.getElementById('lap-sub').textContent =
+    `LAP ${lapNum} COMPLETE · ${state.level} LEVELS TOTAL`;
+
+  const lo = document.getElementById('lap-overlay');
+  lo.classList.remove('burst'); void lo.offsetWidth; lo.classList.add('burst');
+
+  confettiBurst(130, ['#f59e0b','#fbbf24','#fcd34d','#fef08a','#ffffff','#f97316','#ec4899']);
+}
+
+function confettiBurst(n, colors) {
+  const cols = colors || ['#7c3aed','#06b6d4','#f59e0b','#ec4899','#10b981','#f97316'];
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti-piece';
+    c.style.cssText = `
+      left:${Math.random()*100}vw;
+      background:${cols[Math.floor(Math.random()*cols.length)]};
+      width:${6+Math.random()*9}px;height:${6+Math.random()*9}px;
+      border-radius:${Math.random()>.5?'50%':'2px'};
+      animation-duration:${1.3+Math.random()*1.8}s;
+      animation-delay:${Math.random()*0.55}s;
+    `;
+    document.body.appendChild(c);
+    c.addEventListener('animationend', () => c.remove());
+  }
+}
+
+/* ═══════════════════════════════════
+   HISTORY POPUP
+═══════════════════════════════════ */
+function openHistoryPopup(zeroBasedIdx) {
+  const list    = document.getElementById('history-list');
+  const entries = state.entries;
+  list.innerHTML = '';
+
+  if (!entries.length) {
+    list.innerHTML = '<p style="color:var(--muted);font-size:13px">Nothing yet!</p>';
+  } else {
+    // Show newest first
+    [...entries].reverse().forEach((e, i) => {
+      const num = entries.length - i;       // 1-based, newest = entries.length
+      const originalZero = entries.length - 1 - i; // 0-based in state.entries
+      const card = document.createElement('div');
+      card.className = 'entry-card';
+      if (originalZero === zeroBasedIdx) {
+        card.style.borderColor = 'var(--accent)';
+        card.style.boxShadow   = '0 0 0 1px var(--accent), 0 0 20px rgba(124,58,237,0.2)';
+      }
+      const d = new Date(e.timestamp);
+      card.innerHTML = `
+        <div class="entry-number">LEVEL ${e.level} — TASK #${num}</div>
+        <div class="entry-heading">${esc(e.heading)}</div>
+        <div class="entry-desc">${esc(e.desc)}</div>
+        <div class="entry-summary">"${esc(e.summary)}"</div>
+        <div class="entry-meta">${d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})} · ${d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>
+      `;
+      list.appendChild(card);
+    });
+
+    setTimeout(() => {
+      const cards   = list.querySelectorAll('.entry-card');
+      const viewIdx = entries.length - 1 - zeroBasedIdx; 
+      if (cards[viewIdx]) cards[viewIdx].scrollIntoView({ behavior:'smooth', block:'center' });
+    }, 360);
+  }
+
+  document.getElementById('history-sub').textContent =
+    `${entries.length} ACHIEVEMENTS · LEVEL ${state.level}`;
+  document.getElementById('history-overlay').classList.add('active');
+}
+function closeHistoryPopup() { document.getElementById('history-overlay').classList.remove('active'); }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Close overlays on outside click
+document.querySelectorAll('.overlay').forEach(ov => {
+  ov.addEventListener('click', e => { if (e.target===ov) ov.classList.remove('active'); });
+});
+
+/* ═══════════════════════════════════
+   DRAGGABLE BADGE LOGIC
+═══════════════════════════════════ */
+(function initDraggableBadge() {
+  const badge = document.getElementById('lap-badge');
+  let isDragging = false, startX, startY, initialX, initialY;
+
+  badge.addEventListener('mousedown', dragStart);
+  badge.addEventListener('touchstart', dragStart, {passive: false});
+
+  function dragStart(e) {
+    isDragging = true;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    startX = clientX;
+    startY = clientY;
+    const rect = badge.getBoundingClientRect();
+    initialX = rect.left;
+    initialY = rect.top;
+
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('mouseup', dragEnd);
+    document.addEventListener('touchmove', drag, {passive: false});
+    document.addEventListener('touchend', dragEnd);
+  }
+
+  function drag(e) {
+    if (!isDragging) return;
+    e.preventDefault(); 
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+
+    badge.style.left = `${initialX + dx}px`;
+    badge.style.top = `${initialY + dy}px`;
+    badge.style.right = 'auto'; // Break the right alignment constraint
+  }
+
+  function dragEnd() {
+    isDragging = false;
+    document.removeEventListener('mousemove', drag);
+    document.removeEventListener('mouseup', dragEnd);
+    document.removeEventListener('touchmove', drag);
+    document.removeEventListener('touchend', dragEnd);
+    
+    // Auto-save the new position to state
+    state.lapPos = { left: badge.style.left, top: badge.style.top };
+    saveData();
+  }
+})();
+
+
+/* ═══════════════════════════════════
+   BACKGROUND CANVAS
+═══════════════════════════════════ */
+(function(){
+  const canvas = document.getElementById('bg-canvas');
+  const ctx    = canvas.getContext('2d');
+  let W, H, blobs;
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    blobs = Array.from({length:6},(_,i)=>({
+      x:Math.random()*W, y:Math.random()*H,
+      r:200+Math.random()*250,
+      vx:(Math.random()-.5)*.4, vy:(Math.random()-.5)*.4,
+      hue:[260,190,30,330,160,20][i],
+      alpha:0.04+Math.random()*0.06
+    }));
+  }
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    blobs.forEach(b => {
+      b.x+=b.vx; b.y+=b.vy;
+      if(b.x<-b.r)b.x=W+b.r; if(b.x>W+b.r)b.x=-b.r;
+      if(b.y<-b.r)b.y=H+b.r; if(b.y>H+b.r)b.y=-b.r;
+      const g=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.r);
+      g.addColorStop(0,`hsla(${b.hue},80%,55%,${b.alpha})`);
+      g.addColorStop(1,`hsla(${b.hue},80%,55%,0)`);
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize', resize);
+  resize(); draw();
+})();
+
+/* ═══════════════════════════════════
+   INIT
+═══════════════════════════════════ */
+loadData();
+
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') { closeLevelUpPopup(); closeHistoryPopup(); }
+});
+
+// Offer to link data.json if not yet linked
+window.addEventListener('load', () => {
+  if (window.showSaveFilePicker && !fileHandle) {
+    setTimeout(() => {
+      const el = document.getElementById('file-status');
+      el.textContent = '💡 tap to link data.json (auto-save to file)';
+      el.classList.add('show');
+      el.style.cursor = 'pointer';
+      el.style.pointerEvents = 'all';
+      el.onclick = () => {
+        el.style.cursor = ''; el.style.pointerEvents = 'none';
+        connectFile();
+      };
+      statusTimer = setTimeout(() => el.classList.remove('show'), 6000);
+    }, 1800);
+  }
+});
+</script>
+</body>
+</html>
