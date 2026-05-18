@@ -47,8 +47,17 @@
   #streak-count-val { color:var(--text); font-weight:700; }
   @keyframes firePulse { 0% { transform:scale(1); filter:drop-shadow(0 0 2px rgba(245,158,11,0.4)); } 100% { transform:scale(1.15); filter:drop-shadow(0 0 8px rgba(245,158,11,0.9)); } }
 
+  #top-right-wrap { display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
   #age-display { font-family:'Space Mono',monospace; font-size:10px; color:var(--muted); text-align:right; line-height:1.9; }
   #age-text { color:var(--accent2); font-size:12px; font-weight:700; letter-spacing:1px; }
+  
+  /* SLEEP TRACKER BUTTON */
+  #sleep-btn {
+    font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1px; color:var(--muted);
+    background:rgba(255,255,255,0.05); border:1px solid var(--border);
+    padding:6px 12px; border-radius:99px; cursor:pointer; transition:all .2s;
+  }
+  #sleep-btn:hover { background:rgba(255,255,255,0.1); color:var(--text); border-color:var(--accent); }
 
   /* CENTER */
   #center { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
@@ -67,7 +76,7 @@
   }
   #level-number small { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:3px; color:var(--muted); margin-top:-6px; }
 
-  /* DRAGGABLE LAP BADGE (Shadow Removed) */
+  /* DRAGGABLE LAP BADGE */
   #lap-badge {
     position:absolute; top:25vh; right:25vw; z-index:10;
     font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1px;
@@ -157,13 +166,15 @@
   .popup-close { position:absolute; top:16px; right:16px; width:30px; height:30px; background:rgba(255,255,255,0.06); border:none; border-radius:50%; color:var(--muted); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .2s; }
   .popup-close:hover { background:rgba(255,255,255,0.12); color:#fff; }
   .popup h2 { font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:2px; margin-bottom:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-  .popup .popup-sub { font-size:12px; color:var(--muted); margin-bottom:28px; font-family:'Space Mono',monospace; }
+  .popup .popup-sub { font-size:12px; color:var(--muted); margin-bottom:28px; font-family:'Space Mono',monospace; text-transform:uppercase;}
 
   .field { margin-bottom:20px; }
   .field label { display:block; font-size:10px; letter-spacing:2px; color:var(--accent2); margin-bottom:8px; font-family:'Space Mono',monospace; text-transform:uppercase; }
-  .field input, .field textarea { width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:'Inter',sans-serif; font-size:14px; outline:none; transition:border-color .2s, box-shadow .2s; resize:none; }
+  .field input[type="text"], .field textarea, .field input[type="time"] { width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:10px; padding:12px 14px; color:var(--text); font-family:'Inter',sans-serif; font-size:14px; outline:none; transition:border-color .2s, box-shadow .2s; resize:none; }
   .field input:focus, .field textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(124,58,237,0.15); }
   .field input::placeholder, .field textarea::placeholder { color:var(--muted); }
+  .field input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor:pointer; opacity: 0.6; transition: opacity 0.2s; }
+  .field input[type="time"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
   .submit-btn { width:100%; padding:15px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none; border-radius:10px; color:#fff; font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:3px; cursor:pointer; transition:all .2s; box-shadow:0 4px 24px rgba(124,58,237,0.3); }
   .submit-btn:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(124,58,237,0.45); }
@@ -232,9 +243,13 @@
         <span>STREAK: <span id="streak-count-val">0</span></span>
       </div>
     </div>
-    <div id="age-display">
-      <span id="age-text">—</span><br/>
-      <span style="font-size:9px;letter-spacing:1px">AGE</span>
+    
+    <div id="top-right-wrap">
+      <div id="age-display">
+        <span id="age-text">—</span><br/>
+        <span style="font-size:9px;letter-spacing:1px">AGE</span>
+      </div>
+      <button id="sleep-btn" onclick="openSleepWakePopup()">☀️/🌙 LOG SLEEP</button>
     </div>
   </div>
 
@@ -311,6 +326,24 @@
       <textarea id="inp-summary" rows="3" placeholder="What did you learn or feel? One insight."></textarea>
     </div>
     <button class="submit-btn" id="submit-btn" onclick="submitLevelUp()">SUBMIT &amp; LEVEL UP</button>
+  </div>
+</div>
+
+<!-- SLEEP/WAKE POPUP -->
+<div class="overlay" id="sleepwake-overlay">
+  <div class="popup" style="width:min(400px, 90vw);">
+    <button class="popup-close" onclick="closeSleepWakePopup()">✕</button>
+    <h2>Sleep & Wake</h2>
+    <p class="popup-sub" id="sw-date-sub">TODAY'S CYCLE</p>
+    <div class="field">
+      <label>☀️ Wake Up Time</label>
+      <input type="time" id="inp-wake" />
+    </div>
+    <div class="field">
+      <label>🌙 Sleep Time (Expected)</label>
+      <input type="time" id="inp-sleep" />
+    </div>
+    <button class="submit-btn" onclick="saveSleepWake()">SAVE TIMES</button>
   </div>
 </div>
 
@@ -413,11 +446,15 @@ function applyPalette(level, animate) {
 const STORAGE_KEY = 'levelup_data';
 const DOB = new Date('2002-05-22');
 
-// Added "streak: 0" to base state for persistence
-let state       = { level:0, entries:[], lapPos: null, streak: 0 };
+// Added sleepLogs: {} to base state
+let state       = { level:0, entries:[], lapPos: null, streak: 0, sleepLogs: {} };
 let fileHandle  = null;
 let tlOpen      = false;
 let statusTimer = null;
+
+function getLocalYMD(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
 
 /* ── Exact age ─────────────────── */
 function updateAge() {
@@ -472,7 +509,6 @@ function updateStreak() {
   // Backup the calculated streak directly into state
   if (state.streak !== streak) {
     state.streak = streak;
-    // (We'll save this automatically during levelup or load)
   }
 
   renderStreak(streak);
@@ -487,7 +523,6 @@ function renderStreak(streak) {
     icon.classList.remove('active');
   }
 }
-
 
 /* ── IndexedDB: persist fileHandle ─ */
 function openIDB() {
@@ -569,10 +604,8 @@ async function loadData() {
   }
 
   renderAll();
-  
-  // Cleanly compute and update streak data just in case a day passed
   updateStreak();
-  saveData(); // Commit the streak change natively if required
+  saveData();
 }
 
 /* ── Connect file manually ─────── */
@@ -608,6 +641,23 @@ function renderAll() {
   renderLevel(); 
   renderTimeline(); 
   updateStreak(); 
+  renderSleepBtn();
+}
+
+function renderSleepBtn() {
+  const today = getLocalYMD();
+  const log = state.sleepLogs && state.sleepLogs[today];
+  const btn = document.getElementById('sleep-btn');
+  
+  if (log && (log.wake || log.sleep)) {
+    btn.style.borderColor = 'var(--accent)';
+    btn.style.color = '#fff';
+    btn.innerHTML = '☀️/🌙 LOGGED TODAY';
+  } else {
+    btn.style.borderColor = 'var(--border)';
+    btn.style.color = 'var(--muted)';
+    btn.innerHTML = '☀️/🌙 LOG SLEEP';
+  }
 }
 
 function renderLevel(animate) {
@@ -652,8 +702,7 @@ function renderTimeline() {
       // 1. Check Date (if a date is selected)
       if (dateQuery) {
         const d = new Date(e.timestamp);
-        // Build Local YYYY-MM-DD to strictly compare with Date picker
-        const localYMD = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        const localYMD = getLocalYMD(d);
         if (localYMD !== dateQuery) return false;
       }
 
@@ -771,6 +820,47 @@ async function submitLevelUp() {
   renderAll();
   confettiBurst(80, null);
   triggerCelebration(isLapFinish);
+}
+
+/* ═══════════════════════════════════
+   SLEEP & WAKE TRACKER POPUP
+═══════════════════════════════════ */
+function openSleepWakePopup() {
+  const today = getLocalYMD();
+  
+  // Format display string like "MONDAY, MAY 18"
+  document.getElementById('sw-date-sub').textContent = new Date().toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'}).toUpperCase();
+  
+  if (!state.sleepLogs) state.sleepLogs = {};
+  const log = state.sleepLogs[today] || { wake: null, sleep: null };
+  
+  document.getElementById('inp-wake').value = log.wake || '';
+  document.getElementById('inp-sleep').value = log.sleep || '';
+  
+  document.getElementById('sleepwake-overlay').classList.add('active');
+}
+
+function closeSleepWakePopup() {
+  document.getElementById('sleepwake-overlay').classList.remove('active');
+}
+
+async function saveSleepWake() {
+  const today = getLocalYMD();
+  if (!state.sleepLogs) state.sleepLogs = {};
+  
+  const w = document.getElementById('inp-wake').value;
+  const s = document.getElementById('inp-sleep').value;
+  
+  // Empty values become null naturally
+  state.sleepLogs[today] = {
+    wake: w ? w : null,
+    sleep: s ? s : null
+  };
+  
+  await saveData();
+  renderSleepBtn();
+  closeSleepWakePopup();
+  showStatus('🌙 times saved');
 }
 
 /* ═══════════════════════════════════
@@ -962,7 +1052,11 @@ document.querySelectorAll('.overlay').forEach(ov => {
 loadData();
 
 document.addEventListener('keydown', e => {
-  if (e.key==='Escape') { closeLevelUpPopup(); closeHistoryPopup(); }
+  if (e.key==='Escape') { 
+    closeLevelUpPopup(); 
+    closeHistoryPopup(); 
+    closeSleepWakePopup(); 
+  }
 });
 
 // Offer to link data.json if not yet linked
