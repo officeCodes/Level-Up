@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,9 +54,10 @@
   
   /* SLEEP TRACKER BUTTON */
   #sleep-btn {
-    font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1px; color:var(--muted);
+    font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1px; color:var(--muted);
     background:rgba(255,255,255,0.05); border:1px solid var(--border);
-    padding:6px 12px; border-radius:99px; cursor:pointer; transition:all .2s;
+    padding:6px 14px; border-radius:99px; cursor:pointer; transition:all .2s;
+    display:flex; gap:12px; align-items:center;
   }
   #sleep-btn:hover { background:rgba(255,255,255,0.1); color:var(--text); border-color:var(--accent); }
 
@@ -179,10 +181,13 @@
   .submit-btn { width:100%; padding:15px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none; border-radius:10px; color:#fff; font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:3px; cursor:pointer; transition:all .2s; box-shadow:0 4px 24px rgba(124,58,237,0.3); }
   .submit-btn:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(124,58,237,0.45); }
   .submit-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+  
+  .secondary-btn { background:rgba(255,255,255,0.05); border:1px solid var(--border); box-shadow:none; font-size:14px; padding:10px; margin-bottom:20px; }
+  .secondary-btn:hover { background:rgba(255,255,255,0.1); border-color:var(--accent); transform:none; box-shadow:none; }
 
   /* HISTORY CARDS */
-  #history-popup .entry-card { background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:14px; transition:border-color .3s, box-shadow .3s; }
-  #history-popup .entry-card:last-child { margin-bottom:0; }
+  .entry-card { background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:14px; transition:border-color .3s, box-shadow .3s; }
+  .entry-card:last-child { margin-bottom:0; }
   .entry-number { font-family:'Bebas Neue',sans-serif; font-size:13px; color:var(--accent2); margin-bottom:2px; }
   .entry-heading { font-size:16px; font-weight:600; margin-bottom:4px; color:#fff; }
   .entry-desc { font-size:13px; color:var(--muted); margin-bottom:8px; line-height:1.5; }
@@ -329,7 +334,7 @@
   </div>
 </div>
 
-<!-- SLEEP/WAKE POPUP -->
+<!-- SLEEP/WAKE INPUT POPUP -->
 <div class="overlay" id="sleepwake-overlay">
   <div class="popup" style="width:min(400px, 90vw);">
     <button class="popup-close" onclick="closeSleepWakePopup()">✕</button>
@@ -344,6 +349,19 @@
       <input type="time" id="inp-sleep" />
     </div>
     <button class="submit-btn" onclick="saveSleepWake()">SAVE TIMES</button>
+  </div>
+</div>
+
+<!-- SLEEP HISTORY POPUP -->
+<div class="overlay" id="sleep-history-overlay">
+  <div class="popup" id="sleep-history-popup">
+    <button class="popup-close" onclick="closeSleepHistoryPopup()">✕</button>
+    <h2>Sleep Timeline</h2>
+    <p class="popup-sub">YOUR REST HISTORY</p>
+    
+    <button class="submit-btn secondary-btn" onclick="closeSleepHistoryPopup(); openSleepWakePopup();">EDIT TODAY'S TIMES</button>
+    
+    <div id="sleep-history-list"></div>
   </div>
 </div>
 
@@ -446,7 +464,6 @@ function applyPalette(level, animate) {
 const STORAGE_KEY = 'levelup_data';
 const DOB = new Date('2002-05-22');
 
-// Added sleepLogs: {} to base state
 let state       = { level:0, entries:[], lapPos: null, streak: 0, sleepLogs: {} };
 let fileHandle  = null;
 let tlOpen      = false;
@@ -454,6 +471,20 @@ let statusTimer = null;
 
 function getLocalYMD(d = new Date()) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function parseLocalYMD(ymd) {
+  const [y, m, d] = ymd.split('-');
+  return new Date(y, m - 1, d);
+}
+
+function formatTimeAMPM(time24) {
+  if (!time24) return '--:--';
+  let [h, m] = time24.split(':');
+  h = parseInt(h, 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12; // convert 0 to 12
+  return `${h}:${m} ${ampm}`;
 }
 
 /* ── Exact age ─────────────────── */
@@ -480,14 +511,12 @@ function updateStreak() {
 
   let checkDate = new Date(current);
   
-  // Check if today or yesterday started the streak
   if (dates.length > 0) {
     if (dates[0] !== checkDate.toDateString()) {
       checkDate.setDate(checkDate.getDate() - 1);
       if (dates[0] === checkDate.toDateString()) {
         // Valid streak start from yesterday
       } else {
-        // Missed yesterday entirely
         streak = 0;
       }
     }
@@ -506,7 +535,6 @@ function updateStreak() {
     }
   }
 
-  // Backup the calculated streak directly into state
   if (state.streak !== streak) {
     state.streak = streak;
   }
@@ -595,7 +623,6 @@ async function loadData() {
     }
   }
 
-  // Restore draggable badge position
   if (state.lapPos) {
     const badge = document.getElementById('lap-badge');
     badge.style.left = state.lapPos.left;
@@ -650,13 +677,21 @@ function renderSleepBtn() {
   const btn = document.getElementById('sleep-btn');
   
   if (log && (log.wake || log.sleep)) {
+    // Has data for today: Show times in AM/PM and open Timeline on click
     btn.style.borderColor = 'var(--accent)';
     btn.style.color = '#fff';
-    btn.innerHTML = '☀️/🌙 LOGGED TODAY';
+    
+    const w = formatTimeAMPM(log.wake);
+    const s = formatTimeAMPM(log.sleep);
+    
+    btn.innerHTML = `<span>☀️ ${w}</span> <span style="color:var(--muted)">|</span> <span>🌙 ${s}</span>`;
+    btn.onclick = openSleepHistoryPopup;
   } else {
+    // No data for today: Show default text and open Input Form on click
     btn.style.borderColor = 'var(--border)';
     btn.style.color = 'var(--muted)';
     btn.innerHTML = '☀️/🌙 LOG SLEEP';
+    btn.onclick = openSleepWakePopup;
   }
 }
 
@@ -664,12 +699,10 @@ function renderLevel(animate) {
   const lvl = state.level;
   document.getElementById('lvl-val').textContent = lvl;
 
-  // Ring fill (0 at start of each lap, full at 10)
   const pct    = (lvl % 10) / 10;
   const circ   = 2 * Math.PI * 100;
   document.getElementById('ring-arc').style.strokeDashoffset = circ - pct * circ;
 
-  // XP bar
   document.getElementById('xp-fill').style.width = (pct * 100) + '%';
   document.getElementById('xp-count').textContent = `${lvl % 10} / 10 tasks`;
 
@@ -682,9 +715,8 @@ function renderTimeline() {
   const entries = state.entries;
   
   const query     = document.getElementById('timeline-search').value.toLowerCase().trim();
-  const dateQuery = document.getElementById('timeline-date-search').value; // 'YYYY-MM-DD' format
+  const dateQuery = document.getElementById('timeline-date-search').value;
   
-  // Removes leading zeroes for robust number searching (e.g., '01' becomes '1')
   const strippedQuery = query.replace(/^0+/, '') || query; 
   
   track.innerHTML = '';
@@ -696,17 +728,13 @@ function renderTimeline() {
     return;
   }
 
-  // Attach original indices & filter
   const filteredReversed = entries.map((e, idx) => ({ ...e, origZero: idx, taskNum: idx + 1 }))
     .filter(e => {
-      // 1. Check Date (if a date is selected)
       if (dateQuery) {
         const d = new Date(e.timestamp);
         const localYMD = getLocalYMD(d);
         if (localYMD !== dateQuery) return false;
       }
-
-      // 2. Check Text / Number Match
       if (query) {
         const matchText = e.taskNum.toString() === strippedQuery || 
                           e.taskNum.toString().includes(query) ||
@@ -715,7 +743,6 @@ function renderTimeline() {
                           e.summary.toLowerCase().includes(query);
         if (!matchText) return false;
       }
-
       return true;
     }).reverse();
 
@@ -731,7 +758,6 @@ function renderTimeline() {
       track.appendChild(line);
     }
     const node = document.createElement('div');
-    // Highlight if it's literally the first ever entry
     node.className = 'tl-node' + (e.taskNum === 1 ? ' first-entry' : '');
     node.textContent = e.taskNum;
     node.title = e.heading;
@@ -739,7 +765,6 @@ function renderTimeline() {
     track.appendChild(node);
   });
 
-  // Auto-scroll to start only if not actively typing to avoid jumpiness
   if (!query && !dateQuery) {
     requestAnimationFrame(() => {
       document.getElementById('timeline-scroll').scrollLeft = 0;
@@ -807,9 +832,7 @@ async function submitLevelUp() {
   state.entries.push({ level:newLevel, heading, desc, summary, timestamp:new Date().toISOString() });
   state.level = newLevel;
 
-  // Make sure we update the streak number BEFORE we save everything to data.json
   updateStreak();
-  
   await saveData();
   closeLevelUpPopup();
 
@@ -823,12 +846,10 @@ async function submitLevelUp() {
 }
 
 /* ═══════════════════════════════════
-   SLEEP & WAKE TRACKER POPUP
+   SLEEP & WAKE TRACKER POPUPS
 ═══════════════════════════════════ */
 function openSleepWakePopup() {
   const today = getLocalYMD();
-  
-  // Format display string like "MONDAY, MAY 18"
   document.getElementById('sw-date-sub').textContent = new Date().toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'}).toUpperCase();
   
   if (!state.sleepLogs) state.sleepLogs = {};
@@ -851,7 +872,6 @@ async function saveSleepWake() {
   const w = document.getElementById('inp-wake').value;
   const s = document.getElementById('inp-sleep').value;
   
-  // Empty values become null naturally
   state.sleepLogs[today] = {
     wake: w ? w : null,
     sleep: s ? s : null
@@ -861,6 +881,48 @@ async function saveSleepWake() {
   renderSleepBtn();
   closeSleepWakePopup();
   showStatus('🌙 times saved');
+}
+
+function openSleepHistoryPopup() {
+  const list = document.getElementById('sleep-history-list');
+  list.innerHTML = '';
+  
+  const logs = state.sleepLogs || {};
+  // Sort reverse chronologically
+  const dates = Object.keys(logs).sort((a,b) => new Date(b) - new Date(a));
+  
+  if (dates.length === 0) {
+    list.innerHTML = '<p style="color:var(--muted);font-size:13px">No sleep data yet!</p>';
+  } else {
+    dates.forEach(d => {
+      const log = logs[d];
+      if(!log.wake && !log.sleep) return; // Skip completely empty days
+      
+      const w = formatTimeAMPM(log.wake);
+      const s = formatTimeAMPM(log.sleep);
+      
+      // Parse local YMD strictly to prevent timezone shifting
+      const dateObj = parseLocalYMD(d); 
+      
+      const card = document.createElement('div');
+      card.className = 'entry-card';
+      card.innerHTML = `
+        <div class="entry-heading" style="margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
+          ${dateObj.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'})}
+        </div>
+        <div class="entry-desc" style="display:flex; justify-content:space-between; margin:0; font-family:'Space Mono',monospace;">
+          <span style="color:var(--accent2)">☀️ WAKE: <strong style="color:#fff">${w}</strong></span>
+          <span style="color:var(--accent)">🌙 SLEEP: <strong style="color:#fff">${s}</strong></span>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  }
+  document.getElementById('sleep-history-overlay').classList.add('active');
+}
+
+function closeSleepHistoryPopup() {
+  document.getElementById('sleep-history-overlay').classList.remove('active');
 }
 
 /* ═══════════════════════════════════
@@ -918,10 +980,9 @@ function openHistoryPopup(zeroBasedIdx) {
   if (!entries.length) {
     list.innerHTML = '<p style="color:var(--muted);font-size:13px">Nothing yet!</p>';
   } else {
-    // Show newest first
     [...entries].reverse().forEach((e, i) => {
-      const num = entries.length - i;       // 1-based, newest = entries.length
-      const originalZero = entries.length - 1 - i; // 0-based in state.entries
+      const num = entries.length - i;       
+      const originalZero = entries.length - 1 - i; 
       const card = document.createElement('div');
       card.className = 'entry-card';
       if (originalZero === zeroBasedIdx) {
@@ -994,7 +1055,7 @@ document.querySelectorAll('.overlay').forEach(ov => {
 
     badge.style.left = `${initialX + dx}px`;
     badge.style.top = `${initialY + dy}px`;
-    badge.style.right = 'auto'; // Break the right alignment constraint
+    badge.style.right = 'auto'; 
   }
 
   function dragEnd() {
@@ -1004,7 +1065,6 @@ document.querySelectorAll('.overlay').forEach(ov => {
     document.removeEventListener('touchmove', drag);
     document.removeEventListener('touchend', dragEnd);
     
-    // Auto-save the new position to state
     state.lapPos = { left: badge.style.left, top: badge.style.top };
     saveData();
   }
@@ -1056,10 +1116,10 @@ document.addEventListener('keydown', e => {
     closeLevelUpPopup(); 
     closeHistoryPopup(); 
     closeSleepWakePopup(); 
+    closeSleepHistoryPopup();
   }
 });
 
-// Offer to link data.json if not yet linked
 window.addEventListener('load', () => {
   if (window.showSaveFilePicker && !fileHandle) {
     setTimeout(() => {
